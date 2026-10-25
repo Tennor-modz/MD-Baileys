@@ -42,7 +42,7 @@
         "chalk": "^4.1.2",
         "futoin-hkdf": "^1.5.1",
         "libphonenumber-js": "^1.10.20",
-        "libsignal": "git+https://github.com/whiskeysockets/libsignal-node",
+        "libsignal": "npm:libsignal-node@^2.0.1",
         "lodash": "^4.17.21",
         "lru-cache": "^11.1.0",
         "music-metadata": "^7.12.3",
