@@ -1,252 +1,141 @@
-# MD-Baileys Upstream Patch
+# @trashcore/baileys
 
-This patch ports critical fixes and new systems from upstream Baileys v7 into **MD-Baileys**.
+[![npm](https://img.shields.io/npm/v/@trashcore/baileys?color=b6ff3c&label=npm)](https://www.npmjs.com/package/@trashcore/baileys)
+[![license](https://img.shields.io/badge/license-MIT-blue)](#license)
 
-> **MD-Baileys** is maintained by [Tennor-modz](https://github.com/Tennor-modz) — a modified WhatsApp api built for multi-device WhatsApp bots with extended features and stability improvements.
+**MD-Baileys** is a modified WhatsApp Web API library for Node.js, built for multi-device bots with extended features and stability fixes. Maintained by [Tennor-modz](https://github.com/Tennor-modz) / Trashcore.
+
+**Current version: `4.2.5`**
+
+---
+
+## 🆕 What's new in 4.2.5
+
+### Fixed: Bad MAC / "Failed to decrypt message with any known session"
+Messages from LID-addressed contacts were being decrypted against the wrong Signal session, which produced endless `Bad MAC` errors. The Signal layer is now LID-aware.
+
+- **LID-aware decryption**: messages are decrypted under the mapped LID address, and the LID ↔ phone-number mapping is learned from the incoming stanza (`lib/Utils/decode-wa-message.js`).
+- **Session migration**: existing PN sessions are migrated to their LID address, including your own account's session on connect (`lib/Signal/libsignal.js`, `lib/Socket/socket.js`).
+- **Identity-change detection fixed**: the identity key was being read from the wrong protobuf field (4 instead of 3), so the check never fired. It now reads the correct field and clears stale sessions when a contact re-registers.
+- **Commit failures are no longer swallowed**: if the final key-store commit failed, the ratchet advanced in memory but not on disk and every later message failed. The error is now thrown (`lib/Utils/auth-utils.js`).
+- **Dependency**: `libsignal` updated from `libsignal-node@^2.0.1` to `^6.0.0`.
+
+> ⚠️ **After upgrading from an older version**, delete the old `session-*.json` files in your auth folder once (or link a fresh session). Existing sessions are already out of sync and will not recover on their own.
 
 ---
 
 ## 📦 Installation
 
-### Install from npm (recommended)
-
 ```bash
 npm install @trashcore/baileys
-```
-
-```bash
+# or
 yarn add @trashcore/baileys
 ```
 
-Then import in your project:
-
-```js
-// CommonJS
-const { makeWASocket } = require('@trashcore/baileys')
-
-// ESM
-import { makeWASocket } from '@trashcore/baileys'
-```
-
----
-
-### Install as a drop-in replacement for @whiskeysockets/baileys
-
-If your existing bot already imports from `@whiskeysockets/baileys` and you don't want to change every import statement, you can alias MD-Baileys to replace it.
-
-**Option 1 — package.json alias (recommended)**
-
-Add this to your bot's `package.json`:
+Pin the exact version:
 
 ```json
 "dependencies": {
-    "@whiskeysockets/baileys": "npm:@trashcore/baileys@latest"
+  "@trashcore/baileys": "^4.2.5"
 }
 ```
 
-Then run:
-
-```bash
-npm install
-```
-
-All your existing `require('@whiskeysockets/baileys')` imports will now resolve to MD-Baileys with no code changes needed.
-
-**Option 2 — Install directly from GitHub**
+Install the latest dev build straight from GitHub (may be unstable):
 
 ```bash
 npm install github:Tennor-modz/MD-Baileys
 ```
 
-```bash
-yarn add github:Tennor-modz/MD-Baileys
+### Drop-in replacement for `@whiskeysockets/baileys`
+
+Keep your existing imports and alias the package in `package.json`:
+
+```json
+"dependencies": {
+  "@whiskeysockets/baileys": "npm:@trashcore/baileys@latest"
+}
 ```
 
-Then import using the GitHub package name:
+Then run `npm install`.
+
+---
+
+## ⚡ Quick start
 
 ```js
-const { makeWASocket } = require('@trashcore/baileys')
+const { default: TrashcoreConnect } = require('@trashcore/baileys')
+
+async function startBot() {
+  const trashcore = await TrashcoreConnect({
+    printQRInTerminal: true,
+    browser: ['Ubuntu', 'Opera', '100.0.4815.0']
+  })
+
+  trashcore.ev.on('messages.upsert', async ({ messages }) => {
+    const msg = messages[0]
+    if (!msg.message) return
+
+    if (msg.message.conversation === 'ping') {
+      await trashcore.sendMessage(msg.key.remoteJid, { text: 'pong!' })
+    }
+  })
+
+  // Optional: pairing code instead of QR
+  // const code = await trashcore.requestPairingCode('1234567890', 'TRASHBOT')
+}
+
+startBot()
 ```
 
 ---
 
-## 🐛 Bugs Fixed by This Patch
+## ✨ Features
 
-### 1. Bad MAC Retry Loops (most impactful)
-**Symptom:** Messages fail to decrypt, triggering infinite retry receipts that never resolve. The bot gets stuck in a loop sending/receiving retry stanzas with the same contact forever.
-
-**Root cause:** The fork used a plain `Map` (`msgRetryCache`) with no intelligence about *why* decryption failed. MAC errors (Signal error codes `4` and `7`) mean the session is definitively out of sync — retrying the same broken session is pointless.
-
-**Fix (`message-retry-manager.js`):** Replaces the plain Map with a full `MessageRetryManager` class that:
-- Identifies MAC errors via the `RetryReason` enum (`SignalErrorInvalidMessage = 4`, `SignalErrorBadMac = 7`)
-- Forces **immediate session recreation** on MAC errors, bypassing the normal 1-hour cooldown
-- Tracks retry counts per message with LRU expiry (15-min TTL)
-- Caches recently sent messages (512 msgs, 5-min TTL) for retry receipt handling
-- Prevents session recreation hammering with a 1-hour cooldown for non-MAC errors
-- Supports phone-based resend fallback with cancellable timeouts
+- QR and custom pairing-code login
+- Low-RAM friendly (runs on ~512 MB hosts)
+- WhatsApp Business buttons, list menus and CTAs
+- LID (Linked Identity) support with session migration
+- Stable multi-device linking and reconnection
 
 ---
 
-### 2. Permanent Bad MAC After Contact Re-registers WhatsApp
-**Symptom:** After a contact uninstalls and reinstalls WhatsApp (new Signal identity), every message from them permanently fails to decrypt with Bad MAC. Clearing the session manually is the only fix.
+## 🧩 Included modules
 
-**Root cause:** WhatsApp sends a `notification type="encrypt"` stanza when a contact's identity key changes. The fork ignored this notification entirely, so the old broken session was never replaced.
+Ported from upstream Baileys v7 and shipped in `lib/`:
 
-**Fix (`identity-change-handler.js`):** Adds `handleIdentityChange()` which:
-- Listens for identity change push notifications
-- Debounces rapid identity changes per JID to avoid redundant re-keying
-- Skips companion devices (only primary device identity matters)
-- Skips self-identity changes
-- Calls `assertSessions()` with `force=true` to tear down and rebuild the Signal session
-- Supports a `onBeforeSessionRefresh` hook for tctoken re-issuance before re-keying
-- Skips session refresh during offline backlog processing (handled separately)
-
----
-
-### 3. Pre-key Race Conditions (intermittent Bad MAC)
-**Symptom:** Intermittent decryption failures, especially under high message load or when multiple messages arrive simultaneously from the same contact.
-
-**Root cause:** Two concurrent decryption operations could both attempt to consume the same one-time pre-key from the Signal key store simultaneously. Whichever wrote back last would corrupt the other's decryption state.
-
-**Fix (`pre-key-manager.js`):** Adds `PreKeyManager` which:
-- Creates a separate `PQueue` (concurrency: 1) per key type (`preKey`, `signedPreKey`, etc.)
-- Serialises all reads and writes for each key type, eliminating the race
-- Validates deletions — skips deleting a key that doesn't exist
-- Inside transactions: validates against the transaction cache
-- Outside transactions: validates against the live store before deleting
-
----
-
-### 4. Node.js Event Loop Blocking on Reconnect
-**Symptom:** After a disconnection with a large message backlog, the bot becomes unresponsive for several seconds on reconnect. Messages or ACKs may be dropped due to timeout.
-
-**Root cause:** The fork processed all offline stanzas synchronously in a tight loop on reconnect, starving the event loop.
-
-**Fix (`offline-node-processor.js`):** Adds `makeOfflineNodeProcessor()` which:
-- Queues offline stanzas and processes them sequentially
-- Yields to the event loop every 10 nodes to stay responsive
-- Catches per-node errors without crashing the whole processing loop
-- Stops processing if the WebSocket closes mid-batch
-
----
-
-### 5. Incorrect ACK Stanza Construction
-**Symptom:** Some ACKs sent by the fork were missing the `from` field on message-class stanzas, which WA Web always includes. Can cause server-side ACK routing issues.
-
-**Fix (`stanza-ack.js`):** Adds `buildAckStanza()` — a pure function that:
-- Always includes `from = meId` for `message`-class ACKs (matching WA Web behaviour)
-- Correctly forwards `participant`, `recipient`, and `type` attributes when present
-- Supports NACK (error ACK) via optional `errorCode` parameter
-
----
-
-### 6. LID-Addressed Messages Always Fail to Decrypt
-**Symptom:** Messages from contacts whose JID has migrated to LID format (Linked ID) silently fail to decrypt. No error is thrown — the message just never arrives.
-
-**Root cause:** The fork had no LID ↔ Phone Number mapping system. Signal sessions are keyed to a JID — when WA addresses a message to a LID JID but the session is stored under the PN JID, the session lookup finds nothing and decryption fails.
-
-**Fix (`lid-mapping.js`):** Adds `LIDMappingStore` which:
-- Maintains a bidirectional LID ↔ PN mapping persisted via `keys.set('lid-mapping', ...)`
-- LRU in-memory cache (3-day TTL) to avoid redundant DB lookups
-- In-flight request deduplication — multiple concurrent lookups for the same JID coalesce into one
-- Falls back to USync (WA's contact sync) when a mapping isn't cached or stored
-- `getLIDForPN(pn)` / `getPNForLID(lid)` / `storeLIDPNMappings(pairs)` API
-
----
-
-### 7. Error 463 on Some 1-to-1 Message Sends
-**Symptom:** Occasionally sending a message to a contact returns a `463` error from WA servers. The message is never delivered.
-
-**Root cause:** WhatsApp's privacy token (`tctoken`) system requires a token to be attached to outgoing 1-to-1 messages. The fork had no tctoken system at all.
-
-**Fix (`tc-token-utils.js`):** Adds the full tctoken system:
-- `buildTcTokenFromJid()` — reads stored token and attaches it to outgoing message content
-- `storeTcTokensFromIqResult()` — persists received tokens from IQ results
-- `resolveTcTokenJid()` — resolves PN JIDs to LID for storage (WA stores tokens under LID)
-- `isTcTokenExpired()` — 28-day rolling bucket expiry check
-- `shouldSendNewTcToken()` — deduplicates token issuance within the same 7-day bucket
-- Token index management for cross-session pruning (`TC_TOKEN_INDEX_KEY`)
-
----
-
-## ✨ New Exports Added
-
-### `lib/WABinary/jid-utils.js` (replaces existing)
-Fully backward-compatible replacement — all old exports preserved, new ones added:
-
-| Export | What it does |
+| Module | Purpose |
 |---|---|
-| `isPnUser(jid)` | Alias for `isJidUser` — checks `@s.whatsapp.net` |
-| `isHostedPnUser(jid)` | Checks `@hosted` server |
-| `isHostedLidUser(jid)` | Checks `@hosted.lid` server |
-| `isJidMetaAI(jid)` | Checks `@bot` server (Meta AI) |
-| `isJidBot(jid)` | Checks bot phone number pattern (`1313555xxxx`) |
-| `isJidNewsletter(jid)` | Fixed spelling (was `isJidNewsLetter`, old name kept as alias) |
-| `getServerFromDomainType(server, domainType)` | Maps `WAJIDDomains` enum → server string |
-| `transferDevice(fromJid, toJid)` | Copies device ID from one JID to another |
-| `WAJIDDomains` | Enum: `WHATSAPP=0, LID=1, HOSTED=128, HOSTED_LID=129` |
-| `META_AI_JID` | Constant: `'13135550002@c.us'` |
-| Full `domainType` in `jidDecode()` | Now correctly sets `HOSTED` and `HOSTED_LID` domain types (fork only handled `LID=1` or `0`) |
+| `Signal/lid-mapping.js` | Bidirectional LID ↔ PN mapping with LRU cache and request coalescing |
+| `Utils/message-retry-manager.js` | Retry tracking with immediate session recreation on MAC errors |
+| `Utils/identity-change-handler.js` | Rebuilds sessions when a contact's identity key changes |
+| `Utils/pre-key-manager.js` | Serialises pre-key access to prevent races |
+| `Utils/offline-node-processor.js` | Processes offline backlog without blocking the event loop |
+| `Utils/stanza-ack.js` | Correct ACK/NACK stanza construction |
+| `Utils/tc-token-utils.js` | Privacy-token (`tctoken`) handling for 1-to-1 sends |
+| `WABinary/jid-utils.js` | Extended JID helpers (`isPnUser`, `isHostedLidUser`, `transferDevice`, `WAJIDDomains`, …) |
 
-### `lib/Utils/index.js` (replaces existing)
-Updated barrel file — re-exports all 6 new Utils modules in addition to all existing ones. No existing exports removed.
+> **Integration status:** `lid-mapping.js` is wired into the Signal layer as of 4.2.5. The retry manager, identity-change handler, pre-key manager, offline processor, ACK builder and tctoken utilities are present but still need their call sites added in `messages-recv.js`, `messages-send.js` and `auth-utils.js` to be fully active.
 
 ---
 
-## 📁 Patch File Placement
+## 🛠 Troubleshooting
 
-```
-your-md-baileys-repo/
-├── lib/
-│   ├── Utils/
-│   │   ├── index.js                    ← REPLACE existing
-│   │   ├── message-retry-manager.js    ← NEW
-│   │   ├── identity-change-handler.js  ← NEW
-│   │   ├── pre-key-manager.js          ← NEW
-│   │   ├── offline-node-processor.js   ← NEW
-│   │   ├── stanza-ack.js               ← NEW
-│   │   └── tc-token-utils.js           ← NEW
-│   ├── Signal/
-│   │   └── lid-mapping.js              ← NEW
-│   └── WABinary/
-│       └── jid-utils.js                ← REPLACE existing
-```
+| Problem | Fix |
+|---|---|
+| `ENOENT: git not found` | Install git (`pkg install git` on Termux) |
+| `Module not found` | Run `npm install` |
+| `Bad MAC` / `Failed to decrypt message with any known session` | Update to 4.2.5, then delete old `session-*.json` files once |
 
----
-
-## 🔧 New npm Dependencies Required
-
-After placing the files, install the two new dependencies:
-
-```bash
-npm install lru-cache p-queue
-```
-
-```bash
-yarn add lru-cache p-queue
-```
-
-- `lru-cache` — used by `MessageRetryManager` and `LIDMappingStore`
-- `p-queue` — used by `PreKeyManager` for per-keyType serialisation
-
-> `lru-cache` may already be in your `package.json` — check before installing.
-
----
-
-## ⚠️ Integration Note
-
-These files are self-contained and will load without errors. However, to fully activate the fixes, the socket layer must be updated to *call* them:
-
-- **`messages-recv.js`** — instantiate `MessageRetryManager` instead of the plain Map; call `handleIdentityChange` on `notification type="encrypt"`; wrap offline stanza processing with `makeOfflineNodeProcessor`; use `buildAckStanza` for ACK construction
-- **`messages-send.js`** — attach tctoken on 1-to-1 sends via `buildTcTokenFromJid`; use `LIDMappingStore` for LID-priority session selection
-- **`auth-utils.js`** — use `PreKeyManager` inside `addTransactionCapability` for pre-key operations
-
-Without those call-site changes, the new modules are importable but dormant.
+> Don't post raw console logs publicly: libsignal session dumps can contain private keys.
 
 ---
 
 ## 🔗 Links
 
-- **Repository:** https://github.com/Tennor-modz/MD-Baileys
-- **Issues:** https://github.com/Tennor-modz/MD-Baileys/issues
-- **Upstream (WhiskeySockets/Baileys):** https://github.com/WhiskeySockets/Baileys
+- Repository: https://github.com/Tennor-modz/MD-Baileys
+- Issues: https://github.com/Tennor-modz/MD-Baileys/issues
+- Upstream: https://github.com/WhiskeySockets/Baileys
+
+## License
+
+MIT
