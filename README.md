@@ -5,11 +5,11 @@
 
 **MD-Baileys** is a modified WhatsApp Web API library for Node.js, built for multi-device bots with extended features and stability fixes. Maintained by [Tennor-modz](https://github.com/Tennor-modz) / Trashcore.
 
-**Current version: `4.2.5`**
+**Current version: `4.2.6`**
 
 ---
 
-## 🆕 What's new in 4.2.5
+## 🆕 What's new in 4.2.6
 
 ### Fixed: Bad MAC / "Failed to decrypt message with any known session"
 Messages from LID-addressed contacts were being decrypted against the wrong Signal session, which produced endless `Bad MAC` errors. The Signal layer is now LID-aware.
@@ -18,6 +18,7 @@ Messages from LID-addressed contacts were being decrypted against the wrong Sign
 - **Session migration**: existing PN sessions are migrated to their LID address, including your own account's session on connect (`lib/Signal/libsignal.js`, `lib/Socket/socket.js`).
 - **Identity-change detection fixed**: the identity key was being read from the wrong protobuf field (4 instead of 3), so the check never fired. It now reads the correct field and clears stale sessions when a contact re-registers.
 - **Commit failures are no longer swallowed**: if the final key-store commit failed, the ratchet advanced in memory but not on disk and every later message failed. The error is now thrown (`lib/Utils/auth-utils.js`).
+- **Hosted device 99 crash fixed**: hosted / Cloud-API companion devices (`:99`) are now skipped when building the device list, so replies no longer fail with `Unexpected non-hosted device JID with device 99` (`lib/Utils/signal.js`).
 - **Dependency**: `libsignal` updated from `libsignal-node@^2.0.1` to `^6.0.0`.
 
 > ⚠️ **After upgrading from an older version**, delete the old `session-*.json` files in your auth folder once (or link a fresh session). Existing sessions are already out of sync and will not recover on their own.
@@ -36,7 +37,7 @@ Pin the exact version:
 
 ```json
 "dependencies": {
-  "@trashcore/baileys": "^4.2.5"
+  "@trashcore/baileys": "^4.2.6"
 }
 ```
 
@@ -114,7 +115,7 @@ Ported from upstream Baileys v7 and shipped in `lib/`:
 | `Utils/tc-token-utils.js` | Privacy-token (`tctoken`) handling for 1-to-1 sends |
 | `WABinary/jid-utils.js` | Extended JID helpers (`isPnUser`, `isHostedLidUser`, `transferDevice`, `WAJIDDomains`, …) |
 
-> **Integration status:** `lid-mapping.js` is wired into the Signal layer as of 4.2.5. The retry manager, identity-change handler, pre-key manager, offline processor, ACK builder and tctoken utilities are present but still need their call sites added in `messages-recv.js`, `messages-send.js` and `auth-utils.js` to be fully active.
+> **Integration status:** `lid-mapping.js` is wired into the Signal layer as of 4.2.6. The retry manager, identity-change handler, pre-key manager, offline processor, ACK builder and tctoken utilities are present but still need their call sites added in `messages-recv.js`, `messages-send.js` and `auth-utils.js` to be fully active.
 
 ---
 
@@ -124,7 +125,8 @@ Ported from upstream Baileys v7 and shipped in `lib/`:
 |---|---|
 | `ENOENT: git not found` | Install git (`pkg install git` on Termux) |
 | `Module not found` | Run `npm install` |
-| `Bad MAC` / `Failed to decrypt message with any known session` | Update to 4.2.5, then delete old `session-*.json` files once |
+| `Unexpected non-hosted device JID with device 99` | Update to 4.2.6 (hosted devices are now skipped) |
+| `Bad MAC` / `Failed to decrypt message with any known session` | Update to 4.2.6, then delete old `session-*.json` files once |
 
 > Don't post raw console logs publicly: libsignal session dumps can contain private keys.
 
