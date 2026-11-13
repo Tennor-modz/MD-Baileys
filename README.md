@@ -5,11 +5,11 @@
 
 **MD-Baileys** is a modified WhatsApp Web API library for Node.js, built for multi-device bots with extended features and stability fixes. Maintained by [Tennor-modz](https://github.com/Tennor-modz) / Trashcore.
 
-**Current version: `4.2.6`**
+**Current version: `4.2.7`**
 
 ---
 
-## 🆕 What's new in 4.2.6
+## 🆕 What's new in 4.2.7
 
 ### Fixed: Bad MAC / "Failed to decrypt message with any known session"
 Messages from LID-addressed contacts were being decrypted against the wrong Signal session, which produced endless `Bad MAC` errors. The Signal layer is now LID-aware.
