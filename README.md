@@ -18,6 +18,8 @@ Messages from LID-addressed contacts were being decrypted against the wrong Sign
 - **Session migration**: existing PN sessions are migrated to their LID address, including your own account's session on connect (`lib/Signal/libsignal.js`, `lib/Socket/socket.js`).
 - **Identity-change detection fixed**: the identity key was being read from the wrong protobuf field (4 instead of 3), so the check never fired. It now reads the correct field and clears stale sessions when a contact re-registers.
 - **Commit failures are no longer swallowed**: if the final key-store commit failed, the ratchet advanced in memory but not on disk and every later message failed. The error is now thrown (`lib/Utils/auth-utils.js`).
+- **Private-chat replies fixed**: `relayMessage` attached an AI `bot` node to every 1-to-1 message by default, so DMs were not delivered while groups worked. It is now opt-in (`AI = false`); messages sent with `ai: true` still get the node (`lib/Socket/messages-send.js`).
+- **Self-chat / own-device fix**: the sender's own device is now also matched by LID when building the device list, so the bot no longer tries to encrypt to itself (`lib/Utils/signal.js`, `lib/Socket/messages-send.js`).
 - **Hosted device 99 crash fixed**: hosted / Cloud-API companion devices (`:99`) are now skipped when building the device list, so replies no longer fail with `Unexpected non-hosted device JID with device 99` (`lib/Utils/signal.js`).
 - **Dependency**: `libsignal` updated from `libsignal-node@^2.0.1` to `^6.0.0`.
 
@@ -37,7 +39,7 @@ Pin the exact version:
 
 ```json
 "dependencies": {
-  "@trashcore/baileys": "^4.2.6"
+  "@trashcore/baileys": "^4.2.7"
 }
 ```
 
@@ -115,7 +117,7 @@ Ported from upstream Baileys v7 and shipped in `lib/`:
 | `Utils/tc-token-utils.js` | Privacy-token (`tctoken`) handling for 1-to-1 sends |
 | `WABinary/jid-utils.js` | Extended JID helpers (`isPnUser`, `isHostedLidUser`, `transferDevice`, `WAJIDDomains`, …) |
 
-> **Integration status:** `lid-mapping.js` is wired into the Signal layer as of 4.2.6. The retry manager, identity-change handler, pre-key manager, offline processor, ACK builder and tctoken utilities are present but still need their call sites added in `messages-recv.js`, `messages-send.js` and `auth-utils.js` to be fully active.
+> **Integration status:** `lid-mapping.js` is wired into the Signal layer as of 4.2.7. The retry manager, identity-change handler, pre-key manager, offline processor, ACK builder and tctoken utilities are present but still need their call sites added in `messages-recv.js`, `messages-send.js` and `auth-utils.js` to be fully active.
 
 ---
 
@@ -125,8 +127,9 @@ Ported from upstream Baileys v7 and shipped in `lib/`:
 |---|---|
 | `ENOENT: git not found` | Install git (`pkg install git` on Termux) |
 | `Module not found` | Run `npm install` |
-| `Unexpected non-hosted device JID with device 99` | Update to 4.2.6 (hosted devices are now skipped) |
-| `Bad MAC` / `Failed to decrypt message with any known session` | Update to 4.2.6, then delete old `session-*.json` files once |
+| Bot replies in groups but not in private chats | Update to 4.2.7 |
+| `Unexpected non-hosted device JID with device 99` | Update to 4.2.7 (hosted devices are now skipped) |
+| `Bad MAC` / `Failed to decrypt message with any known session` | Update to 4.2.7, then delete old `session-*.json` files once |
 
 > Don't post raw console logs publicly: libsignal session dumps can contain private keys.
 
