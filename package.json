@@ -1,6 +1,6 @@
 {
     "name": "@trashcore/baileys",
-    "version": "4.2.7",
+    "version": "4.2.8",
     "description": "WhatsApp Modified By Trashcore",
     "keywords": [
         "whatsapp-baileys"
@@ -42,7 +42,7 @@
         "chalk": "^4.1.2",
         "futoin-hkdf": "^1.5.1",
         "libphonenumber-js": "^1.10.20",
-        "libsignal": "^6.0.0",
+        "libsignal": "6.0.0",
         "lodash": "^4.17.21",
         "lru-cache": "^11.1.0",
         "music-metadata": "^7.12.3",
@@ -55,7 +55,6 @@
         "ws": "^8.13.0"
     },
     "devDependencies": {
-        "@adiwajshing/eslint-config": "github:adiwajshing/eslint-config",
         "@types/got": "^9.6.11",
         "@types/jest": "^27.5.1",
         "@types/node": "^16.0.0",
