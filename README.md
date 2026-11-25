@@ -1,6 +1,8 @@
-# MD-Baileys
+# @mdsockets/baileys
 
 WhatsApp Web API library for Node.js — multi-device bots, low-RAM friendly.
+
+> **Renamed:** this package was previously published as `@trashcore/baileys`. That name is unpublished and must not be used. The maintained package is **`@mdsockets/baileys`**.
 
 **Current version: `4.2.8`** — security release. Read the notice below before upgrading or installing.
 
@@ -8,7 +10,7 @@ WhatsApp Web API library for Node.js — multi-device bots, low-RAM friendly.
 
 ## ⚠️ Security notice — what 4.2.8 fixes
 
-Versions **4.0.0 through 4.2.7** contained code that was **not part of upstream Baileys** and was **not disclosed** to users. Every one of those versions is now unpublished from npm and recorded as malware (`MAL-2026-18905`, `GHSA-646c-v3qw-f7f9`, Socket "Known malware").
+Versions **4.0.0 through 4.2.7** of `@trashcore/baileys` contained code that was **not part of upstream Baileys** and was **not disclosed** to users. Every one of those versions has been unpublished from npm and is tracked as malware (`MAL-2026-18905`, `GHSA-646c-v3qw-f7f9`, Socket "Known malware").
 
 If you installed any version in that range, treat the machine that ran the bot as suspect until you have read the checklist below.
 
@@ -67,37 +69,38 @@ The repo shipped `allow-remote=all` / `allow-git=all`. Deleted.
 These three commands should all come back empty on 4.2.8:
 
 ```bash
-grep -rnE "MTIwMzYz|1203634202|1203634240" node_modules/@trashcore/baileys/lib/
-grep -rn "kiuur" node_modules/@trashcore/baileys/lib/
-grep -nE "\"git\+|github:" node_modules/@trashcore/baileys/package.json
+grep -rnE "MTIwMzYz|1203634202|1203634240" node_modules/@mdsockets/baileys/lib/
+grep -rn "kiuur" node_modules/@mdsockets/baileys/lib/
+grep -nE "\"git\+|github:" node_modules/@mdsockets/baileys/package.json
 ```
 
-## Migration checklist (coming from ≤ 4.2.7)
+## Migration checklist (coming from `@trashcore/baileys` ≤ 4.2.7)
 
 1. `npm uninstall @trashcore/baileys`
-2. Delete the entry from `package.json` and `package-lock.json`, remove `node_modules`, `npm install` again.
-3. Open WhatsApp on the paired phone → **Updates / Channels**. Unfollow any channel you did not join yourself.
-4. Delete old `session-*.json` files in your auth folder and re-link the bot. Sessions from 4.2.x are out of sync anyway (see below).
-5. Rotate any secrets that were in that environment — API keys, bot tokens, `.env` contents.
-6. Install 4.2.8.
+2. Remove any leftover `@trashcore/baileys` entry from `package.json` and `package-lock.json`, delete `node_modules`.
+3. Update every `require('@trashcore/baileys')` / `import ... from '@trashcore/baileys'` in your code to `@mdsockets/baileys`.
+4. Open WhatsApp on the paired phone → **Updates / Channels**. Unfollow any channel you did not join yourself.
+5. Delete old `session-*.json` files in your auth folder and re-link the bot. Sessions from 4.2.x are out of sync anyway (see below).
+6. Rotate any secrets that were in that environment — API keys, bot tokens, `.env` contents.
+7. `npm install @mdsockets/baileys@4.2.8`
 
-Re-publishing under the original name is not possible: `@trashcore/baileys` is unpublished and the advisory is permanent. A clean package needs a new scope/name.
+Re-publishing under the original name is not possible: `@trashcore/baileys` is unpublished and the advisory is permanent.
 
 ---
 
 ## Installation
 
 ```bash
-npm install <your-scope>/baileys@4.2.8
+npm install @mdsockets/baileys@4.2.8
 # or
-yarn add <your-scope>/baileys@4.2.8
+yarn add @mdsockets/baileys@4.2.8
 ```
 
 Pin the exact version — do not float a range on a fork:
 
 ```json
 "dependencies": {
-    "<your-scope>/baileys": "4.2.8"
+    "@mdsockets/baileys": "4.2.8"
 }
 ```
 
@@ -111,7 +114,7 @@ npm install github:Tennor-modz/MD-Baileys
 
 ```json
 "dependencies": {
-    "@whiskeysockets/baileys": "npm:<your-scope>/baileys@4.2.8"
+    "@whiskeysockets/baileys": "npm:@mdsockets/baileys@4.2.8"
 }
 ```
 
@@ -122,25 +125,25 @@ Then `npm install`. If your code imports `makeWASocket` from `@whiskeysockets/ba
 ## Quick start
 
 ```js
-const { default: TrashcoreConnect } = require('@trashcore/baileys')
+const { default: MDConnect } = require('@mdsockets/baileys')
 
 async function startBot() {
-    const trashcore = await TrashcoreConnect({
+    const sock = await MDConnect({
         printQRInTerminal: true,
         browser: ['Ubuntu', 'Opera', '100.0.4815.0']
     })
 
-    trashcore.ev.on('messages.upsert', async ({ messages }) => {
+    sock.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0]
         if (!msg.message) return
 
         if (msg.message.conversation === 'ping') {
-            await trashcore.sendMessage(msg.key.remoteJid, { text: 'pong!' })
+            await sock.sendMessage(msg.key.remoteJid, { text: 'pong!' })
         }
     })
 
     // Optional: pairing code instead of QR
-    // const code = await trashcore.requestPairingCode('1234567890', 'TRASHBOT')
+    // const code = await sock.requestPairingCode('1234567890', 'MDSOCKET')
 }
 
 startBot()
@@ -193,11 +196,11 @@ startBot()
 | Problem | Fix |
 | --- | --- |
 | `ENOENT: git not found` | Install git (`pkg install git` on Termux) |
-| `Module not found` | Run `npm install` |
+| `Module not found` | Run `npm install`, and check you import `@mdsockets/baileys`, not `@trashcore/baileys` |
+| `404` / empty package when installing `@trashcore/baileys` | That name is unpublished. Switch to `@mdsockets/baileys` |
 | Bot replies in groups but not in private chats | Upgrade to 4.2.8, delete old session files |
 | `Unexpected non-hosted device JID with device 99` | Upgrade to 4.2.8 |
 | `Bad MAC` / `Failed to decrypt message with any known session` | Upgrade to 4.2.8, then delete old `session-*.json` once |
-| `npm install` pulls an empty package | You are resolving the unpublished `@trashcore/baileys` placeholder — use the new scope |
 
 > Don't post raw console logs publicly: libsignal session dumps can contain private keys.
 
